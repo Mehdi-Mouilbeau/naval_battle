@@ -78,6 +78,9 @@ class GameScreen extends StatelessWidget {
     final maxBoardSize = maxWidth * 0.9;
     final playerBoardSize = maxBoardSize * 0.75; // Réduction de 25%
     
+    // Obtenir les statistiques de précision
+    final stats = gameState.getAccuracyStats();
+    
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -116,7 +119,29 @@ class GameScreen extends StatelessWidget {
                 },
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            // Afficher les statistiques de précision
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildStatCard(
+                    'Your Accuracy', 
+                    '${stats['playerAccuracy']!.toStringAsFixed(1)}%',
+                    Icons.person,
+                    Colors.blue,
+                  ),
+                  _buildStatCard(
+                    'AI Accuracy', 
+                    '${stats['computerAccuracy']!.toStringAsFixed(1)}%',
+                    Icons.computer,
+                    Colors.red,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
             const Text(
               'Your Board',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -128,6 +153,37 @@ class GameScreen extends StatelessWidget {
                 board: gameState.playerBoard,
                 shots: gameState.computerShots,
                 onTapCell: (_, __) {},
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color,
               ),
             ),
           ],
