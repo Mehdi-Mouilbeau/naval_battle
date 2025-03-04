@@ -16,34 +16,50 @@ class GameBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 10,
+    return Container(
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/oceangrid.png'),
+          fit: BoxFit.cover,
+        ),
       ),
-      itemCount: 100,
-      itemBuilder: (context, index) {
-        final x = index ~/ 10;
-        final y = index % 10;
-        final hasShip = board[x][y];
-        final isShot = shots?[x][y] ?? false;
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 10,
+        ),
+        itemCount: 100,
+        itemBuilder: (context, index) {
+          final x = index ~/ 10;
+          final y = index % 10;
+          final hasShip = board[x][y];
+          final isShot = shots?[x][y] ?? false;
 
-        return GestureDetector(
-          onTap: () => onTapCell(x, y),
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.black),
-              color: _getCellColor(hasShip, isShot),
+          return GestureDetector(
+            onTap: () => onTapCell(x, y),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.black.withOpacity(0.3), width: 0.5),
+                color: _getCellColor(hasShip, isShot),
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
   Color _getCellColor(bool hasShip, bool isShot) {
-    if (!isShot) return (hideShips || !hasShip) ? Colors.blue[100]! : Colors.grey;
-    return hasShip ? Colors.red : Colors.white;
+    if (!isShot) {
+      // Si le navire est présent et qu'on ne doit pas le cacher
+      if (hasShip && !hideShips) {
+        return Colors.grey.withOpacity(0.7);
+      }
+      // Sinon, cellule transparente pour voir l'image de fond
+      return Colors.transparent;
+    }
+    // Si la cellule a été touchée
+    return hasShip ? Colors.red.withOpacity(0.7) : Colors.white.withOpacity(0.3);
   }
 }
