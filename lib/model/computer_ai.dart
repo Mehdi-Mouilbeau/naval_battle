@@ -23,7 +23,6 @@ class ComputerAI {
     _loadMemory();
   }
 
-  /// Sauvegarde la mémoire des tirs avec SharedPreferences
   Future<void> _saveMemory() async {
     final prefs = await SharedPreferences.getInstance();
     List<String> shotsData =
@@ -32,7 +31,6 @@ class ComputerAI {
     prefs.setStringList('shotResults', _shotResults.map((b) => b.toString()).toList());
   }
 
-  /// Charge la mémoire des tirs depuis SharedPreferences
   Future<void> _loadMemory() async {
     final prefs = await SharedPreferences.getInstance();
     List<String>? shotsData = prefs.getStringList('pastShots');
@@ -50,13 +48,15 @@ class ComputerAI {
     }
   }
 
-  /// Réinitialise la mémoire
   Future<void> resetMemory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('pastShots');
     await prefs.remove('shotResults');
     _allShots.clear();
     _shotResults.clear();
+    _successfulHits.clear();
+    _potentialTargets.clear();
+    _qValues = List.generate(10, (_) => List.generate(10, (_) => 0.0));
   }
 
   List<Ship> placeShips(int boardSize, List<int> shipLengths) {
@@ -83,29 +83,77 @@ class ComputerAI {
   }
 
   Position getNextShot(int boardSize) {
+    Position target;
+    
     if (_potentialTargets.isNotEmpty) {
-      Position target = _potentialTargets.removeLast();
-      _allShots.add(target);
-      return target;
+      // Trouver une cible potentielle qui n'a pas encore été tirée
+      int index = _potentialTargets.length - 1;
+      while (index >= 0) {
+        target = _potentialTargets[index];
+        if (!_isPositionShot(target)) {
+          _potentialTargets.removeAt(index);
+          return target;
+        }
+        index--;
+        _potentialTargets.removeAt(index);
+      }
     }
 
+    // Si pas de cibles potentielles valides, choisir une nouvelle position
     return _random.nextDouble() < _explorationRate
         ? _getRandomUntriedPosition(boardSize)
         : _getBestQValuePosition(boardSize);
   }
 
   void registerHitResult(Position shot, bool isHit) {
+    if (!_allShots.any((pos) => pos.x == shot.x && pos.y == shot.y)) {
+      _allShots.add(shot);
+      _shotResults.add(isHit);
+    }
+
     double reward = isHit ? 1.0 : -1.0;
     _updateQValue(shot, reward);
-
-    _allShots.add(shot);
-    _shotResults.add(isHit);
 
     if (isHit) {
       _successfulHits.add(shot);
       _addSmartAdjacentTargets(shot);
+      
+      // Vérifier si un navire a été coulé
+      bool shipSunk = _checkIfShipSunk(shot);
+      if (shipSunk) {
+        _updateQValue(shot, 5.0); // Récompense supplémentaire
+      }
     }
+
     _saveMemory();
+  }
+
+  bool _checkIfShipSunk(Position hitPos) {
+    int horizontalCount = 1;
+    int x = hitPos.x - 1;
+    while (x >= 0 && _successfulHits.any((p) => p.x == x && p.y == hitPos.y)) {
+      horizontalCount++;
+      x--;
+    }
+    x = hitPos.x + 1;
+    while (x < 10 && _successfulHits.any((p) => p.x == x && p.y == hitPos.y)) {
+      horizontalCount++;
+      x++;
+    }
+    
+    int verticalCount = 1;
+    int y = hitPos.y - 1;
+    while (y >= 0 && _successfulHits.any((p) => p.x == hitPos.x && p.y == y)) {
+      verticalCount++;
+      y--;
+    }
+    y = hitPos.y + 1;
+    while (y < 10 && _successfulHits.any((p) => p.x == hitPos.x && p.y == y)) {
+      verticalCount++;
+      y++;
+    }
+    
+    return horizontalCount >= 3 || verticalCount >= 3;
   }
 
   bool _canPlaceShip(List<List<bool>> board, int x, int y, int length, bool isHorizontal, int boardSize) {
@@ -139,6 +187,10 @@ class ComputerAI {
         }
       }
     }
+    if (availablePositions.isEmpty) {
+      // Si toutes les positions ont été tirées (ne devrait jamais arriver)
+      return Position(0, 0);
+    }
     return availablePositions[_random.nextInt(availablePositions.length)];
   }
 
@@ -161,27 +213,67 @@ class ComputerAI {
       }
     }
 
-    return bestPositions.isEmpty ? _getRandomUntriedPosition(boardSize) : bestPositions[_random.nextInt(bestPositions.length)];
+    return bestPositions.isEmpty 
+        ? _getRandomUntriedPosition(boardSize) 
+        : bestPositions[_random.nextInt(bestPositions.length)];
   }
 
   void _updateQValue(Position pos, double reward) {
     _qValues[pos.x][pos.y] += _learningRate * (reward - _qValues[pos.x][pos.y]);
-  }
-
-  void _addSmartAdjacentTargets(Position hit) {
+    
+    // Propager la récompense aux cases adjacentes
     List<Position> adjacentPositions = [
-      Position(hit.x - 1, hit.y),
-      Position(hit.x + 1, hit.y),
-      Position(hit.x, hit.y - 1),
-      Position(hit.x, hit.y + 1),
+      Position(pos.x - 1, pos.y),
+      Position(pos.x + 1, pos.y),
+      Position(pos.x, pos.y - 1),
+      Position(pos.x, pos.y + 1),
     ];
-    for (var pos in adjacentPositions) {
-      if (_isValidPosition(pos) && !_isPositionShot(pos) && !_potentialTargets.contains(pos)) {
-        _potentialTargets.add(pos);
+    
+    for (var adjPos in adjacentPositions) {
+      if (_isValidPosition(adjPos)) {
+        _qValues[adjPos.x][adjPos.y] += _learningRate * reward * _discountFactor;
       }
     }
   }
 
-  bool _isValidPosition(Position pos) => pos.x >= 0 && pos.x < 10 && pos.y >= 0 && pos.y < 10;
-  bool _isPositionShot(Position pos) => _allShots.contains(pos);
+  void _addSmartAdjacentTargets(Position hit) {
+    if (_successfulHits.length >= 2) {
+      Position lastHit = _successfulHits[_successfulHits.length - 2];
+      
+      if (lastHit.x == hit.x) {
+        // Alignement vertical
+        _addPotentialTarget(Position(hit.x, hit.y - 1));
+        _addPotentialTarget(Position(hit.x, hit.y + 1));
+      } else if (lastHit.y == hit.y) {
+        // Alignement horizontal
+        _addPotentialTarget(Position(hit.x - 1, hit.y));
+        _addPotentialTarget(Position(hit.x + 1, hit.y));
+      } else {
+        // Pas d'alignement, tester les 4 directions
+        _addAllAdjacentTargets(hit);
+      }
+    } else {
+      _addAllAdjacentTargets(hit);
+    }
+  }
+
+  void _addAllAdjacentTargets(Position hit) {
+    _addPotentialTarget(Position(hit.x - 1, hit.y));
+    _addPotentialTarget(Position(hit.x + 1, hit.y));
+    _addPotentialTarget(Position(hit.x, hit.y - 1));
+    _addPotentialTarget(Position(hit.x, hit.y + 1));
+  }
+
+  void _addPotentialTarget(Position pos) {
+    if (_isValidPosition(pos) && !_isPositionShot(pos) && 
+        !_potentialTargets.any((p) => p.x == pos.x && p.y == pos.y)) {
+      _potentialTargets.add(pos);
+    }
+  }
+
+  bool _isValidPosition(Position pos) => 
+      pos.x >= 0 && pos.x < 10 && pos.y >= 0 && pos.y < 10;
+
+  bool _isPositionShot(Position pos) => 
+      _allShots.any((p) => p.x == pos.x && p.y == pos.y);
 }
