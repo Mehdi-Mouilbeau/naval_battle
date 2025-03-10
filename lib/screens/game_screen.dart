@@ -1,11 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:naval_battle/model/game_mode.dart';
 import 'package:naval_battle/model/game_state.dart';
 import 'package:naval_battle/model/position.dart';
+import 'package:naval_battle/services/ble_service.dart';
 import 'package:provider/provider.dart';
 import '../widgets/game_board.dart';
 
-class GameScreen extends StatelessWidget {
-  const GameScreen({super.key});
+class GameScreen extends StatefulWidget {
+  final BleService bleService;
+  final bool isHost;
+  final GameMode gameMode;
+
+  const GameScreen({
+    super.key,
+    required this.bleService,
+    required this.isHost,
+    required this.gameMode,
+  });
+
+  @override
+  State<GameScreen> createState() => _GameScreenState();
+}
+
+class _GameScreenState extends State<GameScreen> {
+  @override
+  void initState() {
+    super.initState();
+    
+    if (widget.gameMode == GameMode.bluetooth) {
+      // Écoute des messages Bluetooth si en mode Bluetooth
+      widget.bleService.onShotReceived = (Position shot) {
+        Provider.of<GameState>(context, listen: false).receiveShot(shot);
+      };
+
+      widget.bleService.onHitResponseReceived = (Position pos, bool hit) {
+        Provider.of<GameState>(context, listen: false).receiveHitResponse(pos, hit);
+      };
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +59,7 @@ class GameScreen extends StatelessWidget {
       body: SafeArea(
         child: Consumer<GameState>(
           builder: (context, gameState, child) {
-            return gameState.isPlacingShips 
+            return gameState.isPlacingShips
                 ? _buildPlacementPhase(context, gameState)
                 : _buildBattlePhase(context, gameState);
           },
@@ -39,7 +71,7 @@ class GameScreen extends StatelessWidget {
   Widget _buildPlacementPhase(BuildContext context, GameState gameState) {
     final maxWidth = MediaQuery.of(context).size.width;
     final maxBoardSize = maxWidth * 0.9;
-    
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -77,10 +109,9 @@ class GameScreen extends StatelessWidget {
     final maxWidth = MediaQuery.of(context).size.width;
     final maxBoardSize = maxWidth * 0.9;
     final playerBoardSize = maxBoardSize * 0.75; // Réduction de 25%
-    
-    // Obtenir les statistiques de précision
+
     final stats = gameState.getAccuracyStats();
-    
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -90,7 +121,7 @@ class GameScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  gameState.playerWon ? 'You Won!' : 'Computer Won!',
+                  gameState.playerWon ? 'You Won!' : 'Opponent Won!',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -101,7 +132,7 @@ class GameScreen extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
-                'Computer\'s Board',
+                'Opponent\'s Board',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ),
@@ -114,26 +145,25 @@ class GameScreen extends StatelessWidget {
                 hideShips: true,
                 onTapCell: (x, y) {
                   if (!gameState.isPlacingShips) {
-                    gameState.fireShot(Position(x, y));
+                    _sendShot(x, y, gameState);
                   }
                 },
               ),
             ),
             const SizedBox(height: 10),
-            // Afficher les statistiques de précision
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildStatCard(
-                    'Your Accuracy', 
+                    'Your Accuracy',
                     '${stats['playerAccuracy']!.toStringAsFixed(1)}%',
                     Icons.person,
                     Colors.blue,
                   ),
                   _buildStatCard(
-                    'AI Accuracy', 
+                    'Opponent Accuracy',
                     '${stats['computerAccuracy']!.toStringAsFixed(1)}%',
                     Icons.computer,
                     Colors.red,
@@ -160,7 +190,17 @@ class GameScreen extends StatelessWidget {
       ),
     );
   }
-  
+
+  void _sendShot(int x, int y, GameState gameState) {
+    final shot = Position(x, y);
+    gameState.fireShot(shot);
+    
+    // Si en mode Bluetooth, envoyez la position via Bluetooth
+    if (widget.gameMode == GameMode.bluetooth) {
+      widget.bleService.sendShot(shot);
+    }
+  }
+
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Card(
       elevation: 4,
@@ -190,5 +230,11 @@ class GameScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    widget.bleService.dispose();
+    super.dispose();
   }
 }

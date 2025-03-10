@@ -16,7 +16,7 @@ class GameState extends ChangeNotifier {
   late bool isGameOver;
   late bool playerWon;
   late List<Position> currentShipCells;
-  
+
   // Statistiques pour suivre les performances de l'IA
   int computerHits = 0;
   int computerMisses = 0;
@@ -62,13 +62,12 @@ class GameState extends ChangeNotifier {
   }
 
   void restartGame({bool resetAI = false}) {
-  if (resetAI) {
-    computerAI.resetMemory();
+    if (resetAI) {
+      computerAI.resetMemory();
+    }
+    _initializeGame();
+    notifyListeners();
   }
-  _initializeGame();
-  notifyListeners();
-}
-
 
   bool _isAdjacentToExistingShip(int x, int y) {
     // Check all adjacent cells including diagonals
@@ -76,19 +75,19 @@ class GameState extends ChangeNotifier {
       for (int j = -1; j <= 1; j++) {
         int newX = x + i;
         int newY = y + j;
-        
+
         // Skip if out of bounds
         if (newX < 0 || newX >= boardSize || newY < 0 || newY >= boardSize) {
           continue;
         }
-        
+
         // Skip the current cell being checked
         if (i == 0 && j == 0) {
           continue;
         }
-        
+
         // Check if there's a ship cell that's not part of the current ship
-        if (playerBoard[newX][newY] && 
+        if (playerBoard[newX][newY] &&
             !currentShipCells.any((cell) => cell.x == newX && cell.y == newY)) {
           return true;
         }
@@ -99,7 +98,7 @@ class GameState extends ChangeNotifier {
 
   bool _isAdjacentToCurrentShip(int x, int y) {
     if (currentShipCells.isEmpty) return true;
-    
+
     // Check if the new cell is adjacent to any cell in the current ship
     for (var cell in currentShipCells) {
       // Check horizontal and vertical adjacency (not diagonal)
@@ -108,7 +107,7 @@ class GameState extends ChangeNotifier {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -117,39 +116,39 @@ class GameState extends ChangeNotifier {
     if (playerBoard[x][y] && !currentShipCells.any((cell) => cell.x == x && cell.y == y)) {
       return false;
     }
-    
+
     // Check if the cell is adjacent to another ship
     if (_isAdjacentToExistingShip(x, y)) {
       return false;
     }
-    
+
     // For the first cell, no additional checks needed
     if (currentShipCells.isEmpty) return true;
-    
+
     // Check if the new cell is adjacent to the current ship
     if (!_isAdjacentToCurrentShip(x, y)) {
       return false;
     }
-    
+
     final firstCell = currentShipCells[0];
-    bool isHorizontal = currentShipCells.length > 1 
+    bool isHorizontal = currentShipCells.length > 1
         ? currentShipCells.every((cell) => cell.x == firstCell.x)
         : (x == firstCell.x || y == firstCell.y);
     bool isVertical = currentShipCells.length > 1
         ? currentShipCells.every((cell) => cell.y == firstCell.y)
         : (x == firstCell.x || y == firstCell.y);
-    
+
     // If we already have multiple cells, enforce the direction
     if (currentShipCells.length > 1) {
       if (isHorizontal && x != firstCell.x) return false;
       if (isVertical && y != firstCell.y) return false;
     }
-    
+
     // Check if adding this cell would exceed the ship length
     if (isHorizontal) {
       int minY = currentShipCells.map((p) => p.y).reduce((a, b) => a < b ? a : b);
       int maxY = currentShipCells.map((p) => p.y).reduce((a, b) => a > b ? a : b);
-      
+
       // If the new cell is outside the current range, check if it would make the ship too long
       if (y < minY) {
         if (maxY - y + 1 > shipLength) return false;
@@ -157,11 +156,11 @@ class GameState extends ChangeNotifier {
         if (y - minY + 1 > shipLength) return false;
       }
     }
-    
+
     if (isVertical) {
       int minX = currentShipCells.map((p) => p.x).reduce((a, b) => a < b ? a : b);
       int maxX = currentShipCells.map((p) => p.x).reduce((a, b) => a > b ? a : b);
-      
+
       // If the new cell is outside the current range, check if it would make the ship too long
       if (x < minX) {
         if (maxX - x + 1 > shipLength) return false;
@@ -169,15 +168,15 @@ class GameState extends ChangeNotifier {
         if (x - minX + 1 > shipLength) return false;
       }
     }
-    
+
     return true;
   }
 
   void handleCellTap(int x, int y) {
     if (!isPlacingShips || remainingShips.isEmpty) return;
-    
+
     final position = Position(x, y);
-    
+
     // If the cell is already part of the current ship, remove it and all subsequent cells
     if (currentShipCells.any((cell) => cell.x == x && cell.y == y)) {
       int index = currentShipCells.indexWhere((cell) => cell.x == x && cell.y == y);
@@ -189,7 +188,7 @@ class GameState extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    
+
     // Check if we can place a new cell
     if (currentShipCells.isEmpty) {
       if (!playerBoard[x][y]) {
@@ -200,38 +199,38 @@ class GameState extends ChangeNotifier {
       if (canPlaceShipCell(x, y, remainingShips[0]) && !playerBoard[x][y]) {
         currentShipCells.add(position);
         playerBoard[x][y] = true;
-        
+
         if (currentShipCells.length == remainingShips[0]) {
           ships.add(Ship(currentShipCells.first, currentShipCells.last));
           remainingShips.removeAt(0);
           currentShipCells.clear();
-          
+
           if (remainingShips.isEmpty) {
             isPlacingShips = false;
           }
         }
       }
     }
-    
+
     notifyListeners();
   }
 
   bool fireShot(Position pos) {
     if (isPlacingShips || playerShots[pos.x][pos.y] || isGameOver) return false;
-    
+
     playerShots[pos.x][pos.y] = true;
     final isHit = computerBoard[pos.x][pos.y];
-    
+
     // Mettre à jour les statistiques
     if (isHit) {
       playerHits++;
     } else {
       playerMisses++;
     }
-    
+
     // L'ordinateur joue toujours son tour, que le joueur ait touché ou non
     _computerTurn();
-    
+
     _checkGameOver();
     notifyListeners();
     return isHit;
@@ -241,14 +240,14 @@ class GameState extends ChangeNotifier {
     final shot = computerAI.getNextShot(boardSize);
     final isHit = playerBoard[shot.x][shot.y];
     computerShots[shot.x][shot.y] = true;
-    
+
     // Mettre à jour les statistiques
     if (isHit) {
       computerHits++;
     } else {
       computerMisses++;
     }
-    
+
     computerAI.registerHitResult(shot, isHit);
   }
 
@@ -272,20 +271,58 @@ class GameState extends ChangeNotifier {
       playerWon = allComputerShipsHit;
     }
   }
-  
+
   // Méthode pour obtenir les statistiques de précision
   Map<String, double> getAccuracyStats() {
-    double playerAccuracy = playerHits > 0 
-        ? playerHits / (playerHits + playerMisses) * 100 
+    double playerAccuracy = playerHits > 0
+        ? playerHits / (playerHits + playerMisses) * 100
         : 0.0;
-    
-    double computerAccuracy = computerHits > 0 
-        ? computerHits / (computerHits + computerMisses) * 100 
+
+    double computerAccuracy = computerHits > 0
+        ? computerHits / (computerHits + computerMisses) * 100
         : 0.0;
-    
+
     return {
       'playerAccuracy': playerAccuracy,
       'computerAccuracy': computerAccuracy,
     };
+  }
+
+  // Nouvelle méthode pour recevoir un tir
+  void receiveShot(Position pos) {
+    if (isGameOver) return;
+
+    computerShots[pos.x][pos.y] = true;
+    final isHit = playerBoard[pos.x][pos.y];
+
+    // Mettre à jour les statistiques
+    if (isHit) {
+      computerHits++;
+    } else {
+      computerMisses++;
+    }
+
+    // Informer l'IA du résultat du tir
+    computerAI.registerHitResult(pos, isHit);
+
+    _checkGameOver();
+    notifyListeners();
+  }
+
+  // Nouvelle méthode pour recevoir la réponse du tir (touche ou non)
+  void receiveHitResponse(Position pos, bool isHit) {
+    if (isGameOver) return;
+
+    playerShots[pos.x][pos.y] = true;
+
+    // Mettre à jour les statistiques
+    if (isHit) {
+      playerHits++;
+    } else {
+      playerMisses++;
+    }
+
+    _checkGameOver();
+    notifyListeners();
   }
 }

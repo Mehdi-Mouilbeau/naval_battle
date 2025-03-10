@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:naval_battle/model/game_state.dart';
 import 'package:provider/provider.dart';
-import 'screens/game_screen.dart';
+import 'screens/home_screen.dart';
 
 void main() {
   runApp(const NavalBattleApp());
@@ -20,7 +20,7 @@ class NavalBattleApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           visualDensity: VisualDensity.adaptivePlatformDensity,
         ),
-        home: const GameScreen(),
+        home: const HomeScreen(),
       ),
     );
   }
