@@ -49,7 +49,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                 );
               },
-              child: const Text('Bluetooth LE Multiplayer'),
+              child: const Text('Multiplayer'),
             ),
           ],
         ),
