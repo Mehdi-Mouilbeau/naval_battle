@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:naval_battle/model/game_mode.dart'; 
-import 'game_screen.dart'; 
-import 'package:naval_battle/services/ble_service.dart';
+import 'package:naval_battle/model/game_mode.dart';
+import 'game_screen.dart';
+import 'lobby_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final BleService _bleService = BleService();
-    final bool _isHost = true; 
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Naval Battle'),
@@ -20,16 +17,15 @@ class HomeScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                textStyle: const TextStyle(fontSize: 20),
+              ),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => GameScreen(
-                      gameMode: GameMode.singlePlayer,
-                      bleService: _bleService,
-                      isHost:
-                          false,
-                    ),
+                    builder: (context) => const GameScreen(gameMode: GameMode.singlePlayer),
                   ),
                 );
               },
@@ -37,15 +33,15 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                textStyle: const TextStyle(fontSize: 20),
+              ),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => GameScreen(
-                      gameMode: GameMode.bluetooth, // Mode Bluetooth
-                      bleService: _bleService, // Service BLE
-                      isHost: _isHost, // Détermine si on est l'hôte ou non
-                    ),
+                    builder: (context) => const LobbyScreen(),
                   ),
                 );
               },

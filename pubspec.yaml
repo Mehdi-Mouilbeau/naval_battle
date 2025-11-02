@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_blue_plus: ^1.35.3
+  flutter_reactive_ble: ^5.4.0
   permission_handler: ^11.4.0
   provider: ^6.1.1
   shared_preferences: ^2.2.2
